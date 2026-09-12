@@ -1,5 +1,7 @@
 # AetherBot
 
+[![tests](https://github.com/malwar77/aetherbot/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/malwar77/aetherbot/actions/workflows/tests.yml)
+
 A production-oriented, safety-first open-source crypto trading bot for
 Python 3.11+, inspired by Freqtrade. CCXT multi-exchange, dry-run paper
 trading as the hard default, a local-LLM advisory layer (Ollama — **no API
