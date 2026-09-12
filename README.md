@@ -73,7 +73,8 @@ aetherbot/
 │   ├── persistence/models.py    # SQLAlchemy (SQLite by default)
 │   ├── telegram/handler.py      # /status /profit /forcebuy /forcesell /pause ...
 │   └── webui/                   # read-only FastAPI dashboard
-├── strategies/RsiEmaCross.py    # example strategy (RSI + EMA)
+├── strategies/                  # runnable examples: RsiEmaCross, EmaCrossStrategy,
+│                                 # DonchianBreakout (education, not recommendations)
 ├── config/config.example.yaml   # dry-run example (the default mode)
 ├── tests/                       # 51 tests: math, gates, AI contract, engine
 ├── Dockerfile · docker-compose.yml (includes an Ollama sidecar)
