@@ -1,0 +1,28 @@
+services:
+  aetherbot:
+    build: .
+    container_name: aetherbot
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./aetherbot.db:/app/aetherbot.db
+      # mount your real config (keep the dry-run example as the default)
+      - ./config:/app/config:ro
+    env_file:
+      - .env            # API keys ONLY via env vars — never in YAML
+    ports:
+      - "127.0.0.1:8080:8080"   # web UI bound to localhost
+
+  # Optional: local LLM for the AI advisory layer (no API keys, no cloud)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aetherbot-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+    # after `docker compose up -d` run once:
+    #   docker compose exec ollama ollama pull llama3.2
+
+volumes:
+  ollama:

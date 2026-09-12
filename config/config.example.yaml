@@ -1,0 +1,82 @@
+# =============================================================
+# AetherBot example configuration — DRY-RUN (paper) mode.
+# This is the mandatory first mode. Copy to config.yaml and edit.
+#
+# SAFETY MODEL (also enforced in code, see aetherbot/config.py):
+#   - dry_run defaults to true. Live trading additionally requires
+#     live_confirmation.confirmed_live: true AND
+#     live_confirmation.risk_disclosure_accepted: true, set by a HUMAN
+#     editing this file. No code path, command, agent, or LLM can set
+#     them programmatically. The bot refuses to start live otherwise.
+#   - Exchange API keys come from environment variables only:
+#     AETHERBOT_EXCHANGE_API_KEY / AETHERBOT_EXCHANGE_API_SECRET.
+# =============================================================
+
+bot_name: "AetherBot (dry-run)"
+
+exchange:
+  name: binance              # ccxt id: binance, bybit, okx, kraken, gate, bitget, hyperliquid...
+  market_type: spot          # spot | future  (future = USDT-M perpetuals)
+  sandbox: false             # exchange testnet/sandbox where supported
+
+mode:
+  dry_run: true              # MANDATORY first mode
+  live_confirmation:         # ignored while dry_run: true
+    confirmed_live: false
+    risk_disclosure_accepted: false
+    risk_disclosure_accepted_at: null   # set e.g. "2026-09-12T12:00:00Z"
+
+account:
+  # virtual balance used in dry-run mode
+  dry_run_start_balance: 10000
+
+trading:
+  timeframe: "15m"            # 1m 5m 15m 1h 4h 1d
+  pairs:
+    whitelist: ["BTC/USDT", "ETH/USDT"]
+    blacklist: []
+  max_open_trades: 3
+  stake_currency: "USDT"
+  stake:
+    mode: percentage         # fixed | percentage | risk_pct
+    amount: 10               # fixed: quote units | percentage: % of balance | risk_pct: % risked per trade
+  candle_source: exchange     # exchange | file  (file for offline/testing)
+
+risk:
+  stoploss: -0.10            # static stop, fraction
+  trailing_stop: true
+  trailing_stop_positive: 0.015
+  trailing_stop_positive_offset: 0.03
+  max_drawdown_pct: 25.0    # halt all new entries if total drawdown exceeds
+  daily_loss_limit_pct: 5.0 # halt new entries for the rest of the UTC day
+  cooldown_minutes: 120     # pause entries after consecutive_losses consecutive losses
+  consecutive_losses: 3
+  use_risk_pct_sizing: true # size from stop distance * stake.amount when stake.mode=risk_pct
+
+ai:
+  enabled: true
+  # Local model via Ollama — no API key needed. Install ollama, then:
+  #   ollama pull llama3.2
+  ollama_url: "http://localhost:11434"
+  ollama_model: "llama3.2"
+  advisory_veto: true        # "against" verdicts skip a signal (the LLM's ONLY power)
+  ml:
+    enabled: false           # optional FreqAI-style sklearn module
+    model: gradient_boosting # gradient_boosting | random_forest | logistic
+    retrain_every_days: 7
+
+telegram:
+  enabled: false             # set true + AETHERBOT_TELEGRAM_TOKEN env var
+  allowed_user_ids: []       # Telegram user ids allowed to send commands
+
+webui:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8080
+
+persistence:
+  db_url: "sqlite:///aetherbot.db"
+
+logging:
+  level: "INFO"
+  file: "logs/aetherbot.log"

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AetherBot — dashboard (read-only)</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0;
+         background: #f6f7f9; color: #1a1d21; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #14171a; color: #e8eaed; }
+    .card { background: #1c2025 !important; border-color: #2a2f36 !important; }
+  }
+  header { padding: 16px 24px; border-bottom: 1px solid #d0d5dd; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .warn { font-size: 12px; color: #b42318; font-weight: 600; }
+  .grid { display: grid; gap: 16px; padding: 24px;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card { background: #fff; border: 1px solid #d0d5dd; border-radius: 10px;
+          padding: 16px; }
+  .card h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase;
+             letter-spacing: .04em; opacity: .65; }
+  .big { font-size: 26px; font-weight: 700; }
+  .neg { color: #b42318; } .pos { color: #067647; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { padding: 6px 8px; border-bottom: 1px solid #e4e7ec;
+           text-align: left; }
+  footer { padding: 8px 24px 24px; font-size: 12px; opacity: .7; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AetherBot — read-only dashboard</h1>
+  <div class="warn">⚠️ Educational software. Live trading can lead to TOTAL
+  LOSS of capital. Dry-run first. Nothing here is financial advice.</div>
+</header>
+<div class="grid">
+  <div class="card"><h2>Mode</h2><div class="big" id="mode">…</div>
+    <div id="pairs"></div></div>
+  <div class="card"><h2>Balance</h2><div class="big" id="balance">…</div></div>
+  <div class="card"><h2>Total P&L (closed)</h2>
+    <div class="big" id="pnl">…</div>
+    <div id="wl"></div></div>
+  <div class="card"><h2>Open trades</h2><div class="big"
+      id="open">…</div></div>
+</div>
+<div class="grid"><div class="card" style="grid-column: 1/-1">
+  <h2>Recent trades</h2>
+  <table><thead><tr><th>pair</th><th>mode</th><th>entry</th><th>exit</th>
+  <th>pnl</th><th>roi</th><th>reason</th><th>opened</th></tr></thead>
+  <tbody id="rows"></tbody></table>
+</div></div>
+<footer>P&L shows real numbers only, including losses. No promise of
+gains is made or implied. No trade controls exist on this page.</footer>
+<script>
+async function refresh() {
+  try {
+    const s = await (await fetch('/api/status')).json();
+    document.getElementById('mode').textContent = (s.mode || '').toUpperCase();
+    document.getElementById('pairs').textContent =
+      (s.pairs || []).join(' · ') + ' · ' + (s.timeframe || '');
+    document.getElementById('pnl').textContent = (s.total_pnl ?? 0).toFixed(4);
+    document.getElementById('pnl').className =
+      'big ' + ((s.total_pnl || 0) < 0 ? 'neg' : 'pos');
+    document.getElementById('wl').textContent =
+      `${s.wins ?? 0} wins / ${s.losses ?? 0} losses`;
+    document.getElementById('open').textContent =
+      (s.open_trades || []).length;
+    document.getElementById('balance').textContent =
+      (s.open_trades||[]).length + ' positions';
+    const rows = await (await fetch('/api/trades?limit=30')).json();
+    document.getElementById('rows').innerHTML = (Array.isArray(rows) ?
+      rows : []).map(t =>
+      `<tr><td>${t.pair}</td><td>${t.mode}</td><td>${t.entry_price}</td>
+       <td>${t.exit_price ?? '—'}</td>
+       <td class="${(t.pnl||0)<0?'neg':'pos'}">${t.pnl ?? 'open'}</td>
+       <td>${t.roi ?? ''}</td><td>${t.stop_reason ?? ''}</td>
+       <td>${t.open_date}</td></tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+refresh(); setInterval(refresh, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+# AetherBot
+
+A production-oriented, safety-first open-source crypto trading bot for
+Python 3.11+, inspired by Freqtrade. CCXT multi-exchange, dry-run paper
+trading as the hard default, a local-LLM advisory layer (Ollama — **no API
+keys**), Telegram + Web UI control, SQLite persistence, backtesting with
+honest benchmark reporting, and an optional sklearn ML module.
+
+> ## ⚠️ SAFETY WARNINGS — READ FIRST
+>
+> - **This software is for EDUCATIONAL purposes.**
+> - **Live trading can lead to TOTAL LOSS OF CAPITAL.**
+> - **Always start in dry-run mode.** It is the default and the mandatory
+>   first mode.
+> - **Never risk money you cannot afford to lose.**
+> - **Nothing in this project is financial advice.** No strategy, backtest,
+>   or AI annotation here is a promise or expectation of gains.
+> - Managing trades on behalf of other people may require licenses in your
+>   jurisdiction. Verify independently — this software is for the account
+>   owner themselves.
+
+---
+
+## Core design principles
+
+1. **Risk in code, never in prompts.** Every order — paper or live — passes
+   the `RiskManager` veto (`aetherbot/risk/risk_manager.py`): max open
+   trades, stake limits, daily loss halt, max drawdown halt, loss-streak
+   cooldown, stop sanity. No AI output can bypass it.
+2. **Dry-run is the hard default.** The paper simulator fills every order
+   against real market prices with simulated fees. Live mode requires
+   **three human-only fields** set by manually editing the config file:
+   `mode.dry_run: false` + `live_confirmation.confirmed_live: true` +
+   `live_confirmation.risk_disclosure_accepted: true` with a timestamp.
+   No CLI flag, code path, agent, or LLM can set them — the bot refuses to
+   start live otherwise (`TradingModeError`).
+3. **The AI is advisory with negative-only power.** The Ollama LLM brain
+   annotates every proposal; a verdict of `against` can *skip* a signal
+   (an advisory veto). It can never create, resize, or approve a trade,
+   and its output is whitelisted to summary/agreement/notes — hallucinated
+   fields (direction, stake, mode, api keys) are dropped by construction.
+   `questions`/`supports` are commentary only. This mirrors the
+   RegimeDesk contract and is enforced by tests.
+4. **No lookahead bias.** The engine only ever acts on the last CLOSED
+   candle; the ML module trains with shuffle-free splits and causal
+   features.
+
+## Project structure
+
+```
+aetherbot/
+├── aetherbot/
+│   ├── config.py                # pydantic config + LIVE-MODE GATE
+│   ├── main.py                  # CLI: start | backtest | download-data | create-strategy | web
+│   ├── ta.py                    # EMA / RSI / ATR (tested vs reference values)
+│   ├── engine/
+│   │   ├── bot.py               # core trading loop (entries, stops, ROI, trailing)
+│   │   ├── force.py             # force-enter/exit — still gated
+│   │   └── strategy/            # Strategy base class + resolver/template
+│   ├── exchange/
+│   │   ├── exchange.py          # CCXT wrapper (spot + USDT-M futures, rate limits)
+│   │   └── dry_run.py           # paper simulator (default venue)
+│   ├── risk/
+│   │   ├── risk_manager.py      # THE veto authority
+│   │   └── position_sizing.py   # pure fixed-risk calculator
+│   ├── ai/
+│   │   ├── brain.py             # Ollama advisory LLM (no API keys)
+│   │   └── ml.py                # optional FreqAI-style sklearn module
+│   ├── backtest/backtester.py   # + buy&hold / EMA-cross benchmark verdicts
+│   ├── data/data.py             # OHLCV download + live/file candle feed
+│   ├── persistence/models.py    # SQLAlchemy (SQLite by default)
+│   ├── telegram/handler.py      # /status /profit /forcebuy /forcesell /pause ...
+│   └── webui/                   # read-only FastAPI dashboard
+├── strategies/RsiEmaCross.py    # example strategy (RSI + EMA)
+├── config/config.example.yaml   # dry-run example (the default mode)
+├── tests/                       # 51 tests: math, gates, AI contract, engine
+├── Dockerfile · docker-compose.yml (includes an Ollama sidecar)
+└── requirements.txt
+```
+
+## Quickstart
+
+```bash
+git clone <this repo> && cd aetherbot
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# 1. optional: the AI layer works fully local, no API keys
+ollama pull llama3.2
+
+# 2. run in DRY-RUN (default — paper fills, no real orders)
+python -m aetherbot.main start --config config/config.example.yaml
+
+# 3. open the read-only dashboard
+open http://127.0.0.1:8080
+
+# other commands
+python -m aetherbot.main download-data --days 90        # OHLCV history
+python -m aetherbot.main backtest --pair BTC/USDT       # + benchmark verdict
+python -m aetherbot.main create-strategy MyStrategy     # scaffold
+python -m aetherbot.main web --config config/config.example.yaml
+```
+
+## Writing a strategy
+
+Subclass `Strategy`, implement the three populate methods:
+
+```python
+class MyStrategy(Strategy):
+    timeframe = "15m"
+    minimal_roi = {"0": 0.04, "30": 0.02, "60": 0.01}
+    stoploss = -0.10
+
+    def populate_indicators(self, df, metadata):
+        df["rsi"] = rsi(df["close"], 14)
+        df["ema_fast"] = ema(df["close"], 9)
+        df["ema_slow"] = ema(df["close"], 21)
+        return df
+
+    def populate_entry_trend(self, df, metadata):
+        df.loc[(df["ema_fast"] > df["ema_slow"])
+               & (df["rsi"] < 70) & (df["volume"] > 0), "enter_long"] = 1
+        return df
+
+    def populate_exit_trend(self, df, metadata):
+        df.loc[df["ema_fast"] < df["ema_slow"], "exit_long"] = 1
+        return df
+```
+
+Optional overrides: `custom_stoploss`, `custom_stake_amount`, `leverage`
+(futures only). Drop the file in `strategies/` and run with
+`--strategy MyStrategy`.
+
+## Configuration & keys
+
+- Config is YAML (`config/config.example.yaml`), validated by pydantic.
+- **API keys come ONLY from environment variables** — `AETHERBOT_EXCHANGE_API_KEY`,
+  `AETHERBOT_EXCHANGE_API_SECRET`, `AETHERBOT_TELEGRAM_TOKEN`. Never in YAML.
+- Pair whitelist/blacklist, timeframes 1m–1d, stake modes
+  (fixed / percentage / risk_pct fixed-risk sizing).
+- Separate configs for dry-run vs live: keep the dry-run example as your
+  default and create a second file only if — and after — you accept the
+  live-mode risks.
+
+### Going live (only if you accept the risks)
+
+Manually edit your config file — nothing else can do it:
+
+```yaml
+mode:
+  dry_run: false
+  live_confirmation:
+    confirmed_live: true
+    risk_disclosure_accepted: true
+    risk_disclosure_accepted_at: "2026-09-12T12:00:00Z"
+```
+
+Then provide exchange keys via env vars and restart. The bot still runs
+the full risk stack, and per-exchange stop-loss/take-profit attachment is
+attempted where supported while the bot ALWAYS monitors stops locally.
+
+## Telegram control
+
+Set `telegram.enabled: true`, `AETHERBOT_TELEGRAM_TOKEN`, and your
+`allowed_user_ids`. Commands: `/status`, `/profit` (real numbers,
+including losses), `/pause`, `/resume`, `/forcebuy <pair>`,
+`/forcesell <id>`, `/reload`. Force commands pass the SAME risk gates as
+signalled entries.
+
+## The AI layer (Ollama, local, no keys)
+
+Every trade proposal is annotated by the LLM brain with a structured read
+(`supports` / `questions` / `against`). With `advisory_veto: true`, an
+`against` verdict skips the signal — the AI's only power, and it is
+negative-only. If Ollama is unreachable, a deterministic local reasoner
+annotates from the proposal's own facts (conservative: ambiguous cases
+read as `questions`). The optional sklearn ML module (`ai.ml.enabled:
+true`) adds a `ml_predict` probability column strategies may use as an
+input feature; it trains on shuffled-free splits with a retraining
+schedule.
+
+## Backtesting honesty
+
+`aetherbot.main backtest` reports absolute P&L AND a verdict against
+buy-and-hold plus a 20/50 EMA-crossover benchmark after fees. A strategy
+that fails to beat naive alternatives is reported as failing — loudly.
+
+## Tests
+
+```bash
+python -m pytest tests/ -q        # 51 tests
+```
+
+Covered: indicator math vs hand-computed/independent reference values,
+position sizing, every risk gate, the live-mode config gate, the dry-run
+simulator, engine entry/exit cycles, force-command gating, the AI
+advisory contract (including adversarial LLM outputs), backtester
+sanity, and ML round-trips.
+
+## Docker
+
+```bash
+cp .env.example .env   # add keys ONLY here
+docker compose up -d   # bot + ollama sidecar
+docker compose exec ollama ollama pull llama3.2
+```
+
+## License
+
+MIT — see LICENSE. Provided as-is, with no warranty, educational
+software only.
