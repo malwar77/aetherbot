@@ -7,3 +7,5 @@ logs/
 data/*.parquet
 models/*.pkl
 .venv/
+data_/
+.pytest_cache/
