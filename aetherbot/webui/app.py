@@ -40,9 +40,13 @@ def create_app(config_path: str = "config/config.example.yaml") -> FastAPI:
 
     @app.get("/api/status", response_class=JSONResponse)
     def status():
+        disclaimer = ("Historical and dry-run results do not imply "
+                      "future performance. Live trading can lead to "
+                      "total loss of capital.")
         if not Path(db_file).exists():
             return {"mode": "never started", "note":
-                    "start the bot first: aetherbot start --config ..."}
+                    "start the bot first: aetherbot start --config ...",
+                    "disclaimer": disclaimer}
         con = sqlite3.connect(db_file)
         con.row_factory = sqlite3.Row
         open_t = con.execute("SELECT * FROM trades WHERE is_open=1").fetchall()
@@ -61,9 +65,7 @@ def create_app(config_path: str = "config/config.example.yaml") -> FastAPI:
             "losses": len(closed) - wins,
             "total_pnl": pnl,
             # real numbers only — no expected/potential gains, ever
-            "disclaimer": "Historical and dry-run results do not imply "
-                          "future performance. Live trading can lead to "
-                          "total loss of capital.",
+            "disclaimer": disclaimer,
         }
 
     @app.get("/api/trades", response_class=JSONResponse)
