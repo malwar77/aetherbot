@@ -182,6 +182,36 @@ true`) adds a `ml_predict` probability column strategies may use as an
 input feature; it trains on shuffled-free splits with a retraining
 schedule.
 
+## Going live (real money) — read this first
+
+Live mode is supported but deliberately hard, because losing real
+money is easy and the gates exist to make it harder:
+
+1. `aetherbot go-live --config config/config.example.yaml` prints the
+   full risk disclosure and audits every live gate (dry_run,
+   confirmed_live, risk disclosure acceptance + timestamp, daily
+   loss limit, trading pairs).
+2. If — and only if — you accept the risks, you enable live mode by
+   editing the config YAML BY HAND: `mode.dry_run: false` plus the
+   `live_confirmation` block (`confirmed_live: true`,
+   `risk_disclosure_accepted: true`,
+   `risk_disclosure_accepted_at: <date>`). These are human-only
+   fields: no command, agent or automation can set them.
+3. Re-run `go-live` until all gates pass. The engine then logs a
+   `REAL-MONEY` warning on every single order, and the RiskManager
+   (max trades, daily loss halt, drawdown halt, cooldown, ROI,
+   trailing stops) stays in charge of every trade, live or paper.
+
+Risks you accept by going live: total loss of your deposit; futures
+leverage magnifies losses and liquidations happen fast; slippage,
+spreads, funding fees and thin books make live fills worse than
+dry-run fills and stops can be gapped or wicked through; exchange
+outages, rate limits and network drops can leave positions
+unmanaged 24/7; the RiskManager limits but does not prevent losses;
+the AI brain is advisory-only and can never create, resize or
+approve a trade. Backtest and dry-run results do not predict live
+performance.
+
 ## Backtesting honesty
 
 `aetherbot.main backtest` reports absolute P&L AND a verdict against

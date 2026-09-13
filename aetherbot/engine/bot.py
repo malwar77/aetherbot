@@ -192,6 +192,12 @@ class AetherBot:
             if self.cfg.exchange.market_type == "future" and lev > 1:
                 self.exchange.set_leverage(pair, lev)
         if self.live:
+            # explicit per-order warning: real money, losses possible,
+            # stops can slip; informational only, never blocks/alters
+            log.warning("!! LIVE ORDER — REAL MONEY !! %s buy %.8g: "
+                         "losses are possible; stops can slip; risk "
+                         "limits reduce but do not prevent them.",
+                         pair, amount)
             order = self.exchange.market_order(pair, "buy", amount)
         else:
             # dry-run simulator fills at the last closed candle price

@@ -154,8 +154,48 @@ def main(argv=None) -> int:
     w.add_argument("--config", default="config/config.example.yaml")
     w.set_defaults(fn=cmd_web)
 
+    g = sub.add_parser("go-live",
+                       help="risk disclosure + live-gate audit (never "
+                            "switches to live itself)")
+    g.add_argument("--config", default="config/config.example.yaml")
+    g.set_defaults(fn=cmd_go_live)
+
     args = p.parse_args(argv)
     return args.fn(args)
+
+
+def cmd_go_live(args) -> int:
+    """Print the full risk disclosure and audit every live gate in
+    the config. This command can NEVER switch the bot to live:
+    dry_run: false and the live_confirmation block are human-only
+    fields, set by editing the YAML by hand."""
+    from .live_readiness import LiveReadiness, RISK_DISCLOSURE
+    cfg = load_config(args.config)
+    lr = LiveReadiness(cfg)
+    print()
+    for line in RISK_DISCLOSURE:
+        print(line)
+    print()
+    print("live-readiness audit for %s:" % args.config)
+    for name, ok, detail in lr.checks():
+        print("  [%s] %s — %s" % ("ok" if ok else "FAIL", name, detail))
+    print()
+    if lr.ready:
+        print("ALL LIVE GATES PASS. The engine logs a REAL-MONEY warning")
+        print("on every live order and the RiskManager stays in charge.")
+        return 0
+    print("NOT READY: %d gate(s) above still fail."
+          % sum(1 for _, ok, _ in lr.checks() if not ok))
+    print("To go live, edit the config YAML BY HAND:")
+    print("  mode:")
+    print("    dry_run: false")
+    print("    live_confirmation:")
+    print("      confirmed_live: true")
+    print("      risk_disclosure_accepted: true")
+    print("      risk_disclosure_accepted_at: <today's date>")
+    print("Then re-run: aetherbot go-live --config %s" % args.config)
+    print("No command, agent or automation will make these edits for you.")
+    return 1
 
 
 if __name__ == "__main__":
