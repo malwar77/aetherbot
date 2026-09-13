@@ -84,7 +84,7 @@ aetherbot/
 ## Quickstart
 
 ```bash
-git clone <this repo> && cd aetherbot
+git clone https://github.com/malwar77/aetherbot.git && cd aetherbot
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
@@ -103,6 +103,92 @@ python -m aetherbot.main backtest --pair BTC/USDT       # + benchmark verdict
 python -m aetherbot.main create-strategy MyStrategy     # scaffold
 python -m aetherbot.main web --config config/config.example.yaml
 ```
+
+## New here? Start here
+
+AetherBot is a self-hosted crypto trading bot in the spirit of
+Freqtrade: dry-run paper trading as the hard default, risk rules in
+code, backtests with honest benchmarks, and a fully local AI layer
+(Ollama) that only advises. No cloud, no signup, no mandatory API
+keys.
+
+**What you need:** Python 3.11+, git, and (optional) Ollama for the
+local AI annotations. Exchange API keys are only required if/when YOU
+choose to go live — dry-run simulates fills against real market
+prices with no keys at all.
+
+1. Clone and set up:
+   ```bash
+   git clone https://github.com/malwar77/aetherbot.git
+   cd aetherbot
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   python3 -m pytest tests/ -q        # all green = healthy clone
+   ```
+2. Optional AI layer (fully local, no keys):
+   ```bash
+   ollama pull llama3.2
+   ```
+3. Copy the example config and run DRY-RUN (the default — paper
+   fills, no real orders):
+   ```bash
+   cp config/config.example.yaml config/config.yaml
+   python -m aetherbot.main start --config config/config.yaml --once
+   python -m aetherbot.main start --config config/config.yaml
+   ```
+4. Open the read-only dashboard at http://127.0.0.1:8080
+5. Backtest with the mandatory benchmark verdict:
+   ```bash
+   python -m aetherbot.main download-data --days 90
+   python -m aetherbot.main backtest --pair BTC/USDT
+   ```
+
+**Stay in dry-run until you understand what the RiskManager blocks
+and why.** Going live is deliberately hard and requires you to hand-
+edit three confirmation fields in your config — see **Going live
+(real money)** below. No command does it for you.
+
+## Windows installation
+
+AetherBot runs natively on Windows — no WSL needed. Open PowerShell:
+
+1. Install Python 3.11+ and git:
+   ```
+   winget install -e Python.Python.3.12
+   winget install -e Git.Git
+   ```
+   (or download from https://www.python.org/downloads and tick
+   "Add python.exe to PATH"). Start a fresh PowerShell afterwards.
+2. Clone and set up:
+   ```
+   git clone https://github.com/malwar77/aetherbot.git
+   cd aetherbot
+   py -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   python -m pytest tests/ -q
+   ```
+   If Activate.ps1 is blocked, run once:
+   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+   (or use `.venv\Scripts\activate.bat` in cmd).
+3. Everywhere the docs say `python3`, use `python` on Windows, e.g.:
+   ```
+   copy config\config.example.yaml config\config.yaml
+   python -m aetherbot.main start --config config\config.yaml --once
+   python -m aetherbot.main backtest --pair BTC/USDT
+   ```
+   The SQLite database and OHLCV parquet files are created under
+   `data\` relative to the project — no registry, no system-wide
+   installs.
+4. Optional local AI layer: install Ollama for Windows from
+   https://ollama.com/download/windows, then `ollama pull llama3.2`.
+   AetherBot finds it at http://localhost:11434 by default.
+5. Morning report beacon (optional): set `AGENT_API_BASE` and
+   `AGENT_API_KEY` in your environment, then schedule with Task
+   Scheduler instead of cron:
+   ```
+   schtasks /Create /SC DAILY /ST 07:15 /TN "AetherBotReport" /TR "cmd /c cd /d C:\path\to\aetherbot && .venv\Scripts\python.exe -m aetherbot.main report --config config\config.yaml"
+   ```
 
 ## Writing a strategy
 
