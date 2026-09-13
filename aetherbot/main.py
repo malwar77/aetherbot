@@ -8,6 +8,8 @@ Commands:
   download-data     download OHLCV history to data/
   create-strategy   scaffold a new strategy in strategies/
   web               run the read-only Web UI dashboard
+  freqtrade-export  export a strategy to a freqtrade IStrategy file
+  deriv-sim         simulate the Deriv digit-under martingale bot
 
 Educational software. Live trading can lead to TOTAL LOSS of capital.
 """
@@ -164,6 +166,19 @@ def main(argv=None) -> int:
                    default=os.environ.get("AGENT_API_KEY", ""))
     r.set_defaults(fn=cmd_report)
 
+    e = sub.add_parser("freqtrade-export",
+                       help="export a strategy to a freqtrade "
+                            "IStrategy file (MIT-clean: no freqtrade "
+                            "code copied)")
+    e.add_argument("--strategy", required=True)
+    e.add_argument("--out", default=None)
+    e.set_defaults(fn=cmd_freqtrade_export)
+    s2 = sub.add_parser("deriv-sim",
+                        help="simulate the Deriv digit-under martingale "
+                             "bot honestly (paper only, educational)")
+    s2.add_argument("--sessions", type=int, default=2000)
+    s2.add_argument("--seed", type=int, default=7)
+    s2.set_defaults(fn=cmd_deriv_sim)
     g = sub.add_parser("go-live",
                        help="risk disclosure + live-gate audit (never "
                             "switches to live itself)")
@@ -196,6 +211,26 @@ def cmd_report(args) -> int:
     ok, detail = send_beacon(payload, args.api_base, args.api_key)
     print("beacon %s: %s" % ("sent" if ok else "FAILED", detail))
     return 0 if ok else 1
+
+
+def cmd_freqtrade_export(args) -> int:
+    """Export an AetherBot strategy to a freqtrade IStrategy file."""
+    from .freqtrade_bridge import export_to_freqtrade
+    from .engine.strategy.resolver import load_strategy
+    strategy = load_strategy(args.strategy)
+    out = args.out or "freqtrade_%s.py" % type(strategy).__name__
+    source = export_to_freqtrade(type(strategy), out_path=out)
+    print("exported %s -> %s" % (args.strategy, out))
+    print("review, backtest inside freqtrade before any live use. "
+          "freqtrade is GPL-3; this file re-bases YOUR code only.")
+    return 0
+
+
+def cmd_deriv_sim(args) -> int:
+    """Run the Deriv digit-under martingale honesty simulation."""
+    from .deriv_sim import summarize
+    print(summarize(args.sessions, args.seed))
+    return 0
 
 
 def cmd_go_live(args) -> int:

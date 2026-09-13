@@ -298,6 +298,48 @@ the AI brain is advisory-only and can never create, resize or
 approve a trade. Backtest and dry-run results do not predict live
 performance.
 
+## Freqtrade bridge (interop, not a code merge)
+
+freqtrade is the industry-standard open-source bot — and GPL-3.0
+licensed. AetherBot is MIT. To keep this repo MIT-clean, the bridge
+copies NO freqtrade source code. Instead it *generates* a strategy
+file that re-bases your own AetherBot strategy on freqtrade's
+IStrategy (the two interfaces are column-compatible by design:
+`enter_long` / `exit_long` / `populate_*`):
+
+```bash
+aetherbot freqtrade-export --strategy EmaCrossStrategy
+# -> freqtrade_EmaCrossStrategy.py — drop into a freqtrade
+#    user_data/strategies/ and run inside your freqtrade tree
+```
+
+The export is a starting point: freqtrade extras (informative pairs,
+protections, order types) may need hand-tuning, and you should
+backtest inside freqtrade before trusting results. Review the file —
+it contains only YOUR code plus the re-base, with the license note
+in the header.
+
+## Deriv digit-under simulator (honesty demo)
+
+A faithful port of a sold-for-$20 Deriv DBot martingale strategy
+("20$ DERIV AUTO BOT", 2023): bets Volatility 100 Index digit-under
+contracts with barrier = (last_digit - 5) % 10, 10x martingale,
+stops at +$1 target or -$1,000 max loss. The simulation runs the
+exact logic on uniform random digits with Deriv's house edge
+modeled (payout = 0.95 x fair odds):
+
+```bash
+aetherbot deriv-sim --sessions 2000
+```
+
+Typical result: ~86% of sessions reach the +$1 target, ~14% bust
+at -$1,000 — mean session PnL about -$100. The high win rate is
+the trap; the martingale makes the rare loss catastrophic. One
+branch (last digit 5 -> barrier 0) is a guaranteed loss. This is
+educational software only: it places no trades and is included so
+nobody risks real money on the original bot expecting different
+math.
+
 ## Morning WhatsApp report (status beacon)
 
 The agent (Base44 Superagent) sends a morning WhatsApp report with

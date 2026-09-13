@@ -17,7 +17,11 @@ def load_strategy(name: str, strategy_dir: str = "strategies"):
             "create-strategy %s`)" % (name, path, name))
     spec = importlib.util.spec_from_file_location("aetherbot_strategy_%s"
                                                   % name, path)
+    import sys
     module = importlib.util.module_from_spec(spec)
+    # register in sys.modules so inspect.getsource works on classes
+    # loaded this way (needed by the freqtrade bridge exporter)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     for attr in dir(module):
         obj = getattr(module, attr)
