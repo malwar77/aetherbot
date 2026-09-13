@@ -158,8 +158,10 @@ def main(argv=None) -> int:
                        help="status snapshot for the agent's morning "
                             "report; optionally POSTs it (read-only)")
     r.add_argument("--config", default="config/config.example.yaml")
-    r.add_argument("--post-url", default=os.environ.get("STATUS_URL", ""))
-    r.add_argument("--token", default=os.environ.get("STATUS_TOKEN", ""))
+    r.add_argument("--api-base",
+                   default=os.environ.get("AGENT_API_BASE", ""))
+    r.add_argument("--api-key",
+                   default=os.environ.get("AGENT_API_KEY", ""))
     r.set_defaults(fn=cmd_report)
 
     g = sub.add_parser("go-live",
@@ -178,21 +180,21 @@ def cmd_report(args) -> int:
     alters trades. Without --post-url (or env STATUS_URL) it prints
     the payload only."""
     import json as _json
-    from .morning_report import build_status, post_status
+    from .morning_report import build_status, send_beacon
     from .persistence.models import make_session
     cfg = load_config(args.config)
     session = make_session(cfg.persistence.db_url)
     payload = build_status(cfg, session)
     session.close()
     print(_json.dumps(payload, indent=2, default=str))
-    if not args.post_url:
-        print("no --post-url / STATUS_URL set: payload printed only")
+    if not args.api_base:
+        print("no --api-base / AGENT_API_BASE set: payload printed only")
         return 0
-    if not args.token:
-        print("no --token / STATUS_TOKEN set: refusing to POST")
+    if not args.api_key:
+        print("no --api-key / AGENT_API_KEY set: refusing to send")
         return 1
-    ok, code, body = post_status(payload, args.post_url, args.token)
-    print("POST %s -> %s %s" % ("ok" if ok else "FAILED", code, body[:200]))
+    ok, detail = send_beacon(payload, args.api_base, args.api_key)
+    print("beacon %s: %s" % ("sent" if ok else "FAILED", detail))
     return 0 if ok else 1
 
 

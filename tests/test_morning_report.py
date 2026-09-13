@@ -14,7 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import aetherbot.morning_report as morning_report
 from aetherbot.config import BotConfig, LiveConfirmation, ModeConfig
-from aetherbot.morning_report import build_status, post_status
+from aetherbot.morning_report import (_pick_conversation_id,
+                                      build_status, send_beacon)
 from aetherbot.persistence.models import Trade, make_session
 
 NOW = datetime(2026, 9, 13, 12, 0, 0, tzinfo=timezone.utc)
@@ -129,42 +130,82 @@ def test_build_status_live_mode_when_opted_in(tmp_path):
     session.close()
 
 
-def test_post_status_round_trip(monkeypatch):
-    captured = {}
+def test_pick_conversation_id_shapes():
+    assert _pick_conversation_id(
+        [{"id": "a"}, {"id": "b"}]) == "a"
+    assert _pick_conversation_id(
+        [{"id": "a"}, {"id": "b", "is_default": True}]) == "b"
+    assert _pick_conversation_id(
+        {"conversations": [{"id": "c"}]}) == "c"
+    assert _pick_conversation_id({"id": "e"}) == "e"
+    assert _pick_conversation_id({}) is None
+    assert _pick_conversation_id([]) is None
+
+
+def test_send_beacon_round_trip(monkeypatch):
+    calls = []
 
     def fake_urlopen(req, timeout=None):
-        captured["url"] = req.full_url
-        captured["data"] = json.loads(req.data.decode())
-        return FakeResponse(200, '{"ok": true}')
+        calls.append((req.method, req.full_url, req.data,
+                      req.get_header("Api_key")))
+        if req.full_url.endswith("/conversations"):
+            return FakeResponse(200, json.dumps(
+                [{"id": "conv-1", "is_default": True},
+                 {"id": "conv-2"}]))
+        return FakeResponse(200, '{"message": {"content": "stored"}}')
 
     monkeypatch.setattr(morning_report.urllib.request, "urlopen",
                         fake_urlopen)
     payload = {"project": "aetherbot", "account": "binance",
                "mode": "dry_run", "generated_at": NOW.isoformat()}
-    ok, code, body = post_status(payload, "https://example.invalid/ingest",
-                                 "sekrit-token")
-    assert ok is True and code == 200
-    assert captured["url"] == "https://example.invalid/ingest"
-    assert captured["data"]["token"] == "sekrit-token"
-    assert captured["data"]["project"] == "aetherbot"
+    ok, detail = send_beacon(payload,
+                             "https://host/api/agents/A1", "key-1")
+    assert ok is True
+    m1, u1, d1, k1 = calls[0]
+    assert m1 == "GET" and u1 == "https://host/api/agents/A1/conversations"
+    assert k1 == "key-1" and d1 is None
+    m2, u2, d2, k2 = calls[1]
+    assert m2 == "POST"
+    assert u2 == "https://host/api/agents/A1/conversations/conv-1/messages"
+    assert k2 == "key-1"
+    sent = json.loads(d2.decode())
+    assert sent["message"].startswith("STATUS BEACON ")
+    inner = json.loads(sent["message"][len("STATUS BEACON "):])
+    assert inner["project"] == "aetherbot"
+    assert inner["account"] == "binance"
 
 
-def test_post_status_http_error_reported(monkeypatch):
+def test_send_beacon_conversation_fetch_fails(monkeypatch):
     def fake_urlopen(req, timeout=None):
         raise urllib.error.HTTPError(
             req.full_url, 401, "Unauthorized", {},
-            io.BytesIO(b'{"ok": false, "error": "unauthorized"}'))
+            io.BytesIO(b'{"message": "bad key"}'))
     monkeypatch.setattr(morning_report.urllib.request, "urlopen",
                         fake_urlopen)
-    ok, code, body = post_status({"x": 1}, "https://x/y", "bad")
-    assert ok is False and code == 401
-    assert "unauthorized" in body
+    ok, detail = send_beacon({"x": 1}, "https://host/api/agents/A1", "bad")
+    assert ok is False and "401" in detail
 
 
-def test_post_status_unreachable_host(monkeypatch):
+def test_send_beacon_no_conversation_found(monkeypatch):
     def fake_urlopen(req, timeout=None):
-        raise OSError("connection refused")
+        return FakeResponse(200, json.dumps({"unexpected": 1}))
     monkeypatch.setattr(morning_report.urllib.request, "urlopen",
                         fake_urlopen)
-    ok, code, body = post_status({"x": 1}, "https://x/y", "t", timeout=2)
-    assert ok is False and code == 0
+    ok, detail = send_beacon({"x": 1}, "https://host/api/agents/A1", "k")
+    assert ok is False and "no conversation" in detail
+
+
+def test_send_beacon_post_fails(monkeypatch):
+    state = {"n": 0}
+
+    def fake_urlopen(req, timeout=None):
+        state["n"] += 1
+        if state["n"] == 1:
+            return FakeResponse(200, json.dumps([{"id": "c1"}]))
+        raise urllib.error.HTTPError(
+            req.full_url, 400, "Bad Request", {},
+            io.BytesIO(b'{"message": "schema mismatch"}'))
+    monkeypatch.setattr(morning_report.urllib.request, "urlopen",
+                        fake_urlopen)
+    ok, detail = send_beacon({"x": 1}, "https://host/api/agents/A1", "k")
+    assert ok is False and "400" in detail and "schema mismatch" in detail
