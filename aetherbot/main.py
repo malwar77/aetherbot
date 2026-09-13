@@ -187,6 +187,12 @@ def main(argv=None) -> int:
     s2.add_argument("--sessions", type=int, default=2000)
     s2.add_argument("--seed", type=int, default=7)
     s2.set_defaults(fn=cmd_deriv_sim)
+    se = sub.add_parser("seasons",
+                        help="list DEMO / REAL MONEY seasons "
+                             "(read-only track record)")
+    se.add_argument("--config", default="config/config.example.yaml")
+    se.set_defaults(fn=cmd_seasons)
+
     g = sub.add_parser("go-live",
                        help="risk disclosure + live-gate audit (never "
                             "switches to live itself)")
@@ -238,6 +244,31 @@ def cmd_deriv_sim(args) -> int:
     """Run the Deriv digit-under martingale honesty simulation."""
     from .deriv_sim import summarize
     print(summarize(args.sessions, args.seed))
+    return 0
+
+
+def cmd_seasons(args) -> int:
+    """List DEMO and REAL MONEY seasons from the trades database.
+    Read-only: nothing here trades, switches modes, or invents
+    history. A REAL MONEY season only exists if dry_run: false was
+    set by hand in the YAML."""
+    from .seasons import load_seasons
+    cfg = load_config(args.config)
+    seasons = load_seasons(cfg.persistence.db_url)
+    print("trading seasons for %s:" % args.config)
+    if not seasons:
+        print("  none — no trades recorded yet.")
+        print("  run the bot in dry-run mode to start a DEMO season.")
+        return 0
+    for s in seasons:
+        print("  %d. [%s] %s -> %s | %d trades | %.1f%% wins | net "
+              "%+.2f USD (fees %.2f) | span %.1f days"
+              % (s["season"], s["label"], s["start"][:10], s["end"][:10],
+                 s["trades"], s["win_rate"], s["net_pnl"], s["fees"],
+                 s["span_days"]))
+    print("a REAL MONEY season only exists if dry_run: false was set "
+          "by hand")
+    print("DEMO seasons do not predict live performance")
     return 0
 
 

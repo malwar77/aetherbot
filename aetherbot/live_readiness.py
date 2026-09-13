@@ -44,8 +44,33 @@ RISK_DISCLOSURE: Tuple[str, ...] = (
 class LiveReadiness:
     """Audit one BotConfig against every live gate. Read-only."""
 
+    # a live gate only passes with real dry-run evidence behind it:
+    # at least PAPER_MIN_TRADES paper trades spanning at least
+    # PAPER_MIN_DAYS days. Young bots have zero track record — the
+    # audit refuses to bless a live switch without one.
+    PAPER_MIN_TRADES = 30
+    PAPER_MIN_DAYS = 30
+
     def __init__(self, config) -> None:
         self.cfg = config
+
+    def paper_history(self) -> Tuple[int, float]:
+        """(paper_trade_count, days_spanned) from the trade DB.
+        (0, 0.0) when the DB is missing/empty — never invented."""
+        try:
+            from .persistence.models import Trade, make_session
+            session = make_session(self.cfg.persistence.db_url)
+            trades = (session.query(Trade)
+                      .filter(Trade.mode == "dry_run")
+                      .order_by(Trade.open_date).all())
+            session.close()
+            if not trades:
+                return 0, 0.0
+            span = (trades[-1].open_date - trades[0].open_date)
+            days = max(0.0, span.total_seconds() / 86400)
+            return len(trades), days
+        except Exception:
+            return 0, 0.0
 
     def checks(self) -> List[Tuple[str, bool, str]]:
         mode = self.cfg.mode
@@ -68,6 +93,19 @@ class LiveReadiness:
             conf.risk_disclosure_accepted is True,
             "set mode.live_confirmation.risk_disclosure_accepted: true "
             "by hand, only after reading the disclosure"))
+
+        if mode.dry_run is False:
+            # only demand paper evidence when someone actually tries
+            # to open the live gate
+            n, days = self.paper_history()
+            out.append((
+                "paper track record (>= %d trades over >= %d days)"
+                % (self.PAPER_MIN_TRADES, self.PAPER_MIN_DAYS),
+                n >= self.PAPER_MIN_TRADES
+                and days >= self.PAPER_MIN_DAYS,
+                "%d dry-run trades spanning %.1f days — run the bot in "
+                "paper mode and build a real track record first"
+                % (n, days)))
 
         out.append((
             "disclosure timestamp recorded",

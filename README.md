@@ -2,8 +2,15 @@
 
 [![tests](https://github.com/malwar77/aetherbot/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/malwar77/aetherbot/actions/workflows/tests.yml)
 
-A production-oriented, safety-first open-source crypto trading bot for
-Python 3.11+, inspired by Freqtrade. CCXT multi-exchange, dry-run paper
+> ⚠️ **EXPERIMENTAL — educational prototype.** This project is young
+> and has zero real-money track record. "Safety-first" describes the
+> design contract (paper default, human-only live gates, RiskManager
+> veto) — it is NOT a guarantee or evidence of proven safety. No
+> performance is claimed; verify everything yourself before risking
+> money.
+
+An open-source crypto trading bot for Python 3.11+, inspired by
+Freqtrade. CCXT multi-exchange, dry-run paper
 trading as the hard default, a local-LLM advisory layer (Ollama — **no API
 keys**), Telegram + Web UI control, SQLite persistence, backtesting with
 honest benchmark reporting, and an optional sklearn ML module.

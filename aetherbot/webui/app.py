@@ -132,6 +132,20 @@ def create_app(config_path: str = "config/config.example.yaml") -> FastAPI:
         con.close()
         return [dict(r) for r in rows]
 
+    @app.get("/api/seasons", response_class=JSONResponse)
+    def seasons():
+        """DEMO / REAL MONEY track-record seasons from the trade DB."""
+        if not Path(db_file).exists():
+            raise HTTPException(404, "no database yet")
+        con = sqlite3.connect(db_file)
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT mode, open_date, pnl, fee_paid, is_win "
+            "FROM trades ORDER BY open_date").fetchall()
+        con.close()
+        from ..seasons import compute_seasons
+        return {"seasons": compute_seasons([dict(r) for r in rows])}
+
     @app.get("/api/candles", response_class=JSONResponse)
     def candles(pair: str = "BTC/USDT", timeframe: str = "1h",
                 limit: int = 300):

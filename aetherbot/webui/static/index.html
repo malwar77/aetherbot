@@ -100,6 +100,7 @@
 
 <div id="disclaimer-slot"></div>
 <div id="tickers" class="sub">loading live tickers…</div>
+  <div id="seasons" class="sub">loading seasons…</div>
 
 <div class="cards">
   <div class="card g"><div class="label">Open positions</div>
@@ -286,6 +287,26 @@ refresh(); loadChart(); loadTickers();
 setInterval(refresh, 5000);
 setInterval(loadTickers, 30000);
 setInterval(loadChart, 60000);
+</script>
+<script>
+async function loadSeasons(){
+  try{
+    const el = document.getElementById("seasons");
+    const r = await fetch("/api/seasons");
+    if (!r.ok){ el.textContent = "seasons: none yet"; return; }
+    const d = await r.json();
+    if (!d.seasons.length){ el.textContent =
+      "seasons: none yet — run dry-run mode to start a DEMO season"; return; }
+    el.innerHTML = "seasons: " + d.seasons.map(s =>
+      `<span style="margin-right:14px">` +
+      (s.label==="REAL MONEY" ? `<span class="neg">` : ``) +
+      `#${s.season} ${s.label} ${s.start.slice(0,10)}→${s.end.slice(0,10)}` +
+      ` · ${s.trades} trades · ${s.win_rate}% wins · net ${s.net_pnl>=0?"+":""}${s.net_pnl.toFixed(2)} USD` +
+      (s.label==="REAL MONEY" ? `</span>` : ``) + `</span>`).join("");
+  }catch(e){ document.getElementById("seasons").textContent =
+    "seasons: unavailable"; }
+}
+loadSeasons(); setInterval(loadSeasons, 60000);
 </script>
 </body>
 </html>
