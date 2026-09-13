@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AetherBot — Terminal</title>
+<title>AetherBot — Live Terminal</title>
+<script src="/static/lightweight-charts.standalone.production.js"></script>
 <style>
   :root {
-    --bg: #04070a; --panel: #0a0f14; --panel2: #0c1218;
+    --bg: #04070a; --panel: #0a0f14; --panel2: #0d141b;
     --green: #00e68a; --green-dim: #06231a;
     --red: #ff4d5e; --red-dim: #26060d;
     --blue: #4da3ff; --blue-dim: #071a2e;
@@ -17,15 +18,15 @@
   * { box-sizing: border-box; }
   body {
     font-family: var(--mono); background: var(--bg); color: var(--text);
-    margin: 0; padding: 20px; max-width: 1100px; margin-inline: auto;
+    margin: 0; padding: 16px; max-width: 1200px; margin-inline: auto;
     background-image:
       radial-gradient(ellipse 800px 300px at 50% -10%,
         rgba(77,163,255,.06), transparent),
       radial-gradient(ellipse 600px 200px at 90% 110%,
         rgba(0,230,138,.05), transparent);
   }
-  header { border-bottom: 1px solid var(--border); padding-bottom: 14px;
-           margin-bottom: 20px; display: flex; align-items: baseline;
+  header { border-bottom: 1px solid var(--border); padding-bottom: 12px;
+           margin-bottom: 14px; display: flex; align-items: baseline;
            justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   h1 { font-size: 17px; margin: 0; letter-spacing: .08em; color: var(--green);
        text-shadow: 0 0 14px rgba(0,230,138,.35); }
@@ -36,35 +37,52 @@
               animation: pulse 2s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
   .sub { color: var(--muted); font-size: 12px; }
-  .cards { display: grid; gap: 14px; grid-template-columns:
-            repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 20px; }
+  #tickers { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tick { background: linear-gradient(180deg, var(--panel2), var(--panel));
+          border: 1px solid var(--border); border-radius: 8px;
+          padding: 8px 12px; font-size: 12px; min-width: 130px; }
+  .tick .p { color: var(--blue); font-weight: 700; }
+  .tick .px { font-size: 13px; }
+  .cards { display: grid; gap: 12px; grid-template-columns:
+            repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 14px; }
   .card { background: linear-gradient(180deg, var(--panel2), var(--panel));
           border: 1px solid var(--border); border-radius: 10px;
-          padding: 16px; position: relative; overflow: hidden; }
+          padding: 12px; position: relative; overflow: hidden; }
   .card::before { content: ""; position: absolute; inset: 0 auto auto 0;
     width: 3px; height: 100%; background: var(--blue); opacity: .8; }
   .card.g::before { background: var(--green); }
   .card.r::before { background: var(--red); }
-  .label { font-size: 11px; letter-spacing: .12em; color: var(--muted);
-           text-transform: uppercase; margin-bottom: 8px; }
-  .value { font-size: 22px; font-weight: 700; }
-  .pos { color: var(--green); text-shadow: 0 0 10px rgba(0,230,138,.3); }
-  .neg { color: var(--red); text-shadow: 0 0 10px rgba(255,77,94,.3); }
+  .label { font-size: 10px; letter-spacing: .12em; color: var(--muted);
+           text-transform: uppercase; margin-bottom: 6px; }
+  .value { font-size: 18px; font-weight: 700; }
+  .pos { color: var(--green); } .neg { color: var(--red); }
   .blue { color: var(--blue); }
+  #chartwrap { background: linear-gradient(180deg, var(--panel2), var(--panel));
+          border: 1px solid var(--border); border-radius: 10px;
+          padding: 10px; margin-bottom: 14px; }
+  #chart { width: 100%; height: 380px; }
+  .chart-head { display: flex; justify-content: space-between;
+          align-items: center; padding: 0 4px 8px; flex-wrap: wrap; gap: 8px; }
+  button { font-family: var(--mono); font-size: 12px; cursor: pointer;
+           background: var(--panel2); color: var(--text);
+           border: 1px solid var(--border); border-radius: 6px;
+           padding: 5px 10px; }
+  button.active { color: var(--green); border-color: var(--green); }
   table { width: 100%; border-collapse: collapse; font-size: 13px;
           background: var(--panel); border: 1px solid var(--border);
-          border-radius: 10px; overflow: hidden; }
-  th { text-align: left; padding: 10px 12px; color: var(--blue);
+          border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+  th { text-align: left; padding: 9px 10px; color: var(--blue);
        background: var(--blue-dim); font-size: 11px; letter-spacing: .1em;
        text-transform: uppercase; }
-  td { padding: 9px 12px; border-top: 1px solid var(--border); }
+  td { padding: 8px 10px; border-top: 1px solid var(--border); }
   tr:hover td { background: rgba(77,163,255,.04); }
   .banner { border: 1px solid var(--border); border-left: 3px solid
             var(--red); background: var(--red-dim); color: #ff8a95;
             padding: 10px 14px; border-radius: 8px; font-size: 12px;
-            margin-bottom: 18px; }
-  .note { color: var(--muted); font-size: 12px; margin-top: 16px;
+            margin-bottom: 14px; display: none; }
+  .note { color: var(--muted); font-size: 11px; margin-top: 8px;
           line-height: 1.6; }
+  h2 { font-size: 13px; letter-spacing: .1em; color: var(--blue); margin: 6px 0 8px; }
   #updated { color: var(--blue); }
   @media (prefers-reduced-motion: reduce) {
     .live-dot { animation: none; } }
@@ -73,14 +91,15 @@
 <body>
 <header>
   <div>
-    <h1><span class="live-dot"></span>AETHER<span class="bot">BOT</span></h1>
-    <div class="sub">read-only terminal · no trade controls by design</div>
+    <h1><span class="live-dot"></span>AETHER<span class="bot">BOT</span> <span class="sub">live terminal</span></h1>
+    <div class="sub">live exchange candles via ccxt · charts: TradingView Lightweight Charts (Apache-2.0, vendored) · no trade controls by design</div>
   </div>
   <div class="sub">mode: <span id="mode" class="blue">…</span> ·
       updated <span id="updated">…</span></div>
 </header>
 
 <div id="disclaimer-slot"></div>
+<div id="tickers" class="sub">loading live tickers…</div>
 
 <div class="cards">
   <div class="card g"><div class="label">Open positions</div>
@@ -95,14 +114,26 @@
     <div class="value" id="pnl">…</div></div>
 </div>
 
-<h2 style="font-size:13px; letter-spacing:.1em; color: var(--blue);">OPEN TRADES</h2>
+<div id="chartwrap"><div class="chart-head">
+  <span>
+    <span class="sub">pair</span>
+    <select id="pair" onchange="loadChart()">
+      <option>BTC/USDT</option><option>ETH/USDT</option>
+      <option>SOL/USDT</option><option>BNB/USDT</option>
+    </select>
+    <span id="tf" style="margin-left:10px"></span>
+  </span>
+  <span class="sub">candles: live from your exchange via ccxt — never synthetic</span>
+</div><div id="chart"></div></div>
+
+<h2>OPEN TRADES</h2>
 <table id="open-table">
   <thead><tr><th>Pair</th><th>Side</th><th>Stake</th><th>Opened</th>
     <th>Current PnL</th></tr></thead>
   <tbody id="open-body"><tr><td colspan="5" class="sub">…</td></tr></tbody>
 </table>
 
-<h2 style="font-size:13px; letter-spacing:.1em; color: var(--blue); margin-top:22px;">RECENT CLOSED TRADES</h2>
+<h2>RECENT CLOSED TRADES</h2>
 <table>
   <thead><tr><th>Pair</th><th>Side</th><th>Stake</th><th>PnL</th>
     <th>Opened</th><th>Closed</th></tr></thead>
@@ -118,6 +149,89 @@ function esc(s) {
 }
 function pnlClass(v) { return v >= 0 ? "pos" : "neg"; }
 function sgn(v) { return (v >= 0 ? "+" : "") + Number(v).toFixed(2); }
+
+let chart = null, candleSeries = null;
+const TIMEFRAMES = ["15m", "1h", "4h", "1d"];
+let activeTf = "1h";
+
+function ensureChart() {
+  if (chart) return;
+  chart = LightweightCharts.createChart(
+    document.getElementById("chart"),
+    { layout: { background: { color: "transparent" }, textColor: "#5f7180" },
+      grid: { vertLines: { color: "#14212c" }, horzLines: { color: "#14212c" } },
+      timeScale: { timeVisible: true, secondsVisible: false },
+      autoSize: true, height: 380 });
+  candleSeries = chart.addCandlestickSeries({
+    upColor: "#00e68a", downColor: "#ff4d5e",
+    borderUpColor: "#00e68a", borderDownColor: "#ff4d5e",
+    wickUpColor: "#00e68a", wickDownColor: "#ff4d5e" });
+  const tf = document.getElementById("tf");
+  TIMEFRAMES.forEach(t => {
+    const b = document.createElement("button");
+    b.textContent = t;
+    if (t === activeTf) b.className = "active";
+    b.onclick = () => { activeTf = t;
+      tf.querySelectorAll("button").forEach(x => x.className = "");
+      b.className = "active"; loadChart(); };
+    tf.appendChild(b);
+  });
+}
+
+async function loadChart() {
+  ensureChart();
+  const pair = document.getElementById("pair").value;
+  try {
+    const r = await fetch("/api/candles?pair=" +
+      encodeURIComponent(pair) + "&timeframe=" + activeTf);
+    const d = await r.json();
+    if (!r.ok) { candleSeries.setData([]);
+      candleSeries.applyOptions({title: pair + " — " + d.detail}); return; }
+    candleSeries.setData(d.candles);
+    candleSeries.applyOptions({title: d.pair + " " + d.timeframe});
+    chart.timeScale().fitContent();
+    await markTrades(pair);
+  } catch (e) { /* keep last chart */ }
+}
+
+async function markTrades(pair) {
+  try {
+    const trades = await (await fetch("/api/trades?limit=200")).json();
+    const mine = (Array.isArray(trades) ? trades : [])
+      .filter(t => t.pair === pair);
+    const markers = [];
+    for (const t of mine) {
+      const openT = Math.floor(new Date(t.open_date).getTime() / 1000);
+      if (openT) markers.push({ time: openT, position: "belowBar",
+        color: "#4da3ff", shape: "arrowUp",
+        text: t.side === "sell" ? "close-open" : "open" });
+      if (!t.is_open && t.close_date) {
+        const closeT = Math.floor(new Date(t.close_date).getTime() / 1000);
+        if (closeT) markers.push({ time: closeT, position: "aboveBar",
+          color: (t.pnl || 0) >= 0 ? "#00e68a" : "#ff4d5e",
+          shape: (t.pnl || 0) >= 0 ? "circle" : "arrowDown",
+          text: sgn(t.pnl || 0) });
+      }
+    }
+    markers.sort((a, b) => a.time - b.time);
+    candleSeries.setMarkers(markers);
+  } catch (e) { /* markers optional */ }
+}
+
+async function loadTickers() {
+  try {
+    const r = await fetch("/api/tickers");
+    const d = await r.json();
+    if (!r.ok) { document.getElementById("tickers").textContent =
+      "live tickers unavailable (offline?)"; return; }
+    const box = document.getElementById("tickers");
+    box.innerHTML = Object.entries(d.tickers || {}).map(([pair, t]) =>
+      `<span class="tick"><span class="p">${esc(pair)}</span><br>
+       <span class="px">${t.last != null ? Number(t.last).toPrecision(6) : "?"}</span>
+       ${t.pct != null ? ` <span class="${pnlClass(t.pct)}">${sgn(t.pct)}%</span>` : ""}
+       </span>`).join("") || "no pairs configured";
+  } catch (e) { /* keep old */ }
+}
 
 async function refresh() {
   try {
@@ -149,7 +263,7 @@ async function refresh() {
     if (s.disclaimer) d.textContent = s.disclaimer;
     const slot = document.getElementById("disclaimer-slot");
     if (s.mode === "never started") {
-      slot.innerHTML = `<div class="banner">${esc(s.note)}</div>`;
+      slot.innerHTML = `<div class="banner" style="display:block">${esc(s.note)}</div>`;
     } else { slot.innerHTML = ""; }
     const t = await (await fetch("/api/trades?limit=20")).json();
     const tb = document.getElementById("trades-body");
@@ -168,8 +282,10 @@ async function refresh() {
     document.getElementById("updated").textContent = "connection lost";
   }
 }
-refresh();
+refresh(); loadChart(); loadTickers();
 setInterval(refresh, 5000);
+setInterval(loadTickers, 30000);
+setInterval(loadChart, 60000);
 </script>
 </body>
 </html>

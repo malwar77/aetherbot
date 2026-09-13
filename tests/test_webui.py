@@ -64,3 +64,56 @@ class LanUrlTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LiveDataTests(unittest.TestCase):
+    """Live market-data endpoints: cached candles/tickers via ccxt,
+    honest errors when offline, vendored chart library served."""
+
+    def setUp(self):
+        import aetherbot.webui.app as appmod
+        self.client = TestClient(create_app("config/config.example.yaml"))
+        appmod._candle_cache.clear()
+        appmod._ticker_cache = (0.0, {})
+
+    def test_chart_library_served(self):
+        r = self.client.get(
+            "/static/lightweight-charts.standalone.production.js")
+        self.assertEqual(r.status_code, 200)
+        self.assertGreater(len(r.content), 100000)
+        self.assertIn(b"TradingView", r.content)
+
+    def test_page_uses_lightweight_charts(self):
+        html = self.client.get("/").text
+        self.assertIn("addCandlestickSeries", html)
+        self.assertIn("/api/candles", html)
+        self.assertIn("live exchange candles via ccxt", html)
+
+    def test_candles_honest_when_offline(self):
+        # a bogus exchange name -> honest 503, never synthetic data
+        import aetherbot.webui.app as appmod
+        from unittest.mock import patch
+
+        def boom(pair, timeframe, limit=300):
+            raise RuntimeError("network unreachable")
+        with patch.object(appmod, "fetch_candles", boom):
+            r = self.client.get("/api/candles")
+            self.assertEqual(r.status_code, 503)
+            self.assertIn("unavailable", r.json()["detail"])
+
+    def test_candles_shape(self):
+        import aetherbot.webui.app as appmod
+        from unittest.mock import patch
+
+        def fake_candles(cfg, pair, timeframe, limit=300):
+            return [{"time": 1, "open": 1, "high": 2, "low": 0.5,
+                     "close": 1.5, "volume": 10}]
+        with patch.object(appmod, "fetch_candles", fake_candles):
+            r = self.client.get(
+                "/api/candles?pair=BTC/USDT&timeframe=1h")
+            self.assertEqual(r.status_code, 200)
+            body = r.json()
+            self.assertEqual(body["pair"], "BTC/USDT")
+            self.assertEqual(body["timeframe"], "1h")
+            self.assertEqual(len(body["candles"]), 1)
+            self.assertEqual(body["candles"][0]["close"], 1.5)

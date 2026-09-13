@@ -10,10 +10,62 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..config import load_config
+
+
+# live market data caches (dashboard polls stay polite)
+_candle_cache: dict[tuple, tuple[float, list]] = {}
+_ticker_cache: tuple[float, dict] = (0.0, {})
+_CANDLE_TTL = 60.0
+_TICKER_TTL = 30.0
+
+
+def _market_exchange(cfg):
+    """Public-data exchange instance (no API keys needed for
+    OHLCV/tickers on most exchanges; keys come from env if present)."""
+    from aetherbot.exchange.exchange import CcxtExchange
+    return CcxtExchange(cfg.exchange)
+
+
+def fetch_candles(cfg, pair: str, timeframe: str,
+                  limit: int = 300) -> list[dict]:
+    """OHLCV candles via ccxt, TTL-cached. Real exchange data only —
+    if the fetch fails the caller sees an honest error, never a
+    synthetic chart."""
+    import time as _time
+    key = (pair, timeframe, limit)
+    now = _time.time()
+    hit = _candle_cache.get(key)
+    if hit and now - hit[0] < _CANDLE_TTL:
+        return hit[1]
+    ex = _market_exchange(cfg)
+    raw = ex.fetch_ohlcv(pair, timeframe, limit=limit)
+    data = [{"time": int(c[0] / 1000), "open": c[1], "high": c[2],
+             "low": c[3], "close": c[4], "volume": c[5]} for c in raw]
+    _candle_cache[key] = (now, data)
+    return data
+
+
+def fetch_tickers(cfg, limit: int = 6) -> dict[str, dict]:
+    """Last-price tickers for the first tradeable pairs, TTL-cached."""
+    import time as _time
+    now = _time.time()
+    ts, cached = _ticker_cache
+    if cached and now - ts < _TICKER_TTL:
+        return cached
+    ex = _market_exchange(cfg)
+    out = {}
+    for pair in cfg.tradeable_pairs()[:limit]:
+        t = ex.fetch_ticker(pair)
+        out[pair] = {"last": t.get("last"),
+                     "pct": t.get("percentage"),
+                     "high": t.get("high"), "low": t.get("low")}
+    globals()["_ticker_cache"] = (now, out)
+    return out
 
 
 def lan_url() -> str:
@@ -79,6 +131,32 @@ def create_app(config_path: str = "config/config.example.yaml") -> FastAPI:
             (limit,)).fetchall()
         con.close()
         return [dict(r) for r in rows]
+
+    @app.get("/api/candles", response_class=JSONResponse)
+    def candles(pair: str = "BTC/USDT", timeframe: str = "1h",
+                limit: int = 300):
+        try:
+            return {"pair": pair, "timeframe": timeframe,
+                    "candles": fetch_candles(cfg, pair, timeframe, limit)}
+        except Exception as exc:  # offline / bad pair — honest error
+            raise HTTPException(
+                503, f"live market data unavailable: {exc}")
+
+    @app.get("/api/tickers", response_class=JSONResponse)
+    def tickers():
+        try:
+            return {"tickers": fetch_tickers(cfg)}
+        except Exception as exc:
+            raise HTTPException(503, f"tickers unavailable: {exc}")
+
+    @app.get("/static/lightweight-charts.standalone.production.js")
+    def chart_lib():
+        path = (Path(__file__).parent / "static" /
+                "lightweight-charts.standalone.production.js")
+        if not path.exists():
+            raise HTTPException(404, "chart library missing")
+        return Response(path.read_bytes(),
+                        media_type="application/javascript")
 
     @app.get("/", response_class=HTMLResponse)
     def index():

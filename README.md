@@ -72,7 +72,7 @@ aetherbot/
 │   ├── data/data.py             # OHLCV download + live/file candle feed
 │   ├── persistence/models.py    # SQLAlchemy (SQLite by default)
 │   ├── telegram/handler.py      # /status /profit /forcebuy /forcesell /pause ...
-│   └── webui/                   # read-only FastAPI dashboard
+│   └── webui/                   # live FastAPI dashboard (data-only)
 ├── strategies/                  # runnable examples: RsiEmaCross, EmaCrossStrategy,
 │                                 # DonchianBreakout (education, not recommendations)
 ├── config/config.example.yaml   # dry-run example (the default mode)
@@ -94,7 +94,7 @@ ollama pull llama3.2
 # 2. run in DRY-RUN (default — paper fills, no real orders)
 python -m aetherbot.main start --config config/config.example.yaml
 
-# 3. open the read-only dashboard
+# 3. open the live dashboard
 open http://127.0.0.1:8080
 
 # other commands
@@ -157,7 +157,19 @@ prices with no keys at all.
    python -m aetherbot.main start --config config/config.yaml --once
    python -m aetherbot.main start --config config/config.yaml
    ```
-4. Open the read-only dashboard at http://127.0.0.1:8080
+4. Open the live dashboard at http://127.0.0.1:8080
+
+The dashboard is a live *viewing* terminal, not a trading terminal:
+
+- real candlestick charts (TradingView Lightweight Charts, Apache-2.0,
+  vendored into the repo) with your trades marked on them
+- live candles come from your configured exchange via ccxt; if the
+  fetch fails you get an honest error, never a synthetic chart
+  (note: Binance geo-blocks some regions/VPNs — switch
+  `exchange.name` to `kraken`, `kucoin`, etc. if you see HTTP 451)
+- live ticker strip for your whitelisted pairs
+- there are NO order buttons: execution belongs to the deterministic
+  strategy engine and the RiskManager veto chain, by design
 5. Backtest with the mandatory benchmark verdict:
    ```bash
    python -m aetherbot.main download-data --days 90
@@ -413,3 +425,8 @@ docker compose exec ollama ollama pull llama3.2
 
 MIT — see LICENSE. Provided as-is, with no warranty, educational
 software only.
+## Third-party software
+
+- TradingView Lightweight Charts v4.2.3 (Apache-2.0) — vendored
+  unmodified alongside the dashboard assets. Charts render locally
+  in your browser; no TradingView servers are contacted.

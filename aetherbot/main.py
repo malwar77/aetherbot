@@ -7,7 +7,7 @@ Commands:
   backtest          backtest a strategy over downloaded data
   download-data     download OHLCV history to data/
   create-strategy   scaffold a new strategy in strategies/
-  web               run the read-only Web UI dashboard
+  web               run the live data-only Web UI dashboard
   freqtrade-export  export a strategy to a freqtrade IStrategy file
   deriv-sim         simulate the Deriv digit-under martingale bot
 
@@ -117,7 +117,7 @@ def cmd_web(args) -> int:
     import uvicorn
     from .webui.app import create_app, lan_url
     app = create_app(args.config)
-    print("AetherBot web terminal (read-only — no trade controls here)")
+    print("AetherBot live web terminal (data-only — no trade controls here)")
     print("  this machine:  http://127.0.0.1:%d" % cfg.webui.port)
     if cfg.webui.host not in ("127.0.0.1", "localhost"):
         print("  on your LAN:   http://%s:%d" % (lan_url(), cfg.webui.port))
