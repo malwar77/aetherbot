@@ -154,6 +154,14 @@ def main(argv=None) -> int:
     w.add_argument("--config", default="config/config.example.yaml")
     w.set_defaults(fn=cmd_web)
 
+    r = sub.add_parser("report",
+                       help="status snapshot for the agent's morning "
+                            "report; optionally POSTs it (read-only)")
+    r.add_argument("--config", default="config/config.example.yaml")
+    r.add_argument("--post-url", default=os.environ.get("STATUS_URL", ""))
+    r.add_argument("--token", default=os.environ.get("STATUS_TOKEN", ""))
+    r.set_defaults(fn=cmd_report)
+
     g = sub.add_parser("go-live",
                        help="risk disclosure + live-gate audit (never "
                             "switches to live itself)")
@@ -162,6 +170,30 @@ def main(argv=None) -> int:
 
     args = p.parse_args(argv)
     return args.fn(args)
+
+
+def cmd_report(args) -> int:
+    """Build the bot's status snapshot and optionally POST it to the
+    Superagent ingest endpoint. Read-only: never places, approves or
+    alters trades. Without --post-url (or env STATUS_URL) it prints
+    the payload only."""
+    import json as _json
+    from .morning_report import build_status, post_status
+    from .persistence.models import make_session
+    cfg = load_config(args.config)
+    session = make_session(cfg.persistence.db_url)
+    payload = build_status(cfg, session)
+    session.close()
+    print(_json.dumps(payload, indent=2, default=str))
+    if not args.post_url:
+        print("no --post-url / STATUS_URL set: payload printed only")
+        return 0
+    if not args.token:
+        print("no --token / STATUS_TOKEN set: refusing to POST")
+        return 1
+    ok, code, body = post_status(payload, args.post_url, args.token)
+    print("POST %s -> %s %s" % ("ok" if ok else "FAILED", code, body[:200]))
+    return 0 if ok else 1
 
 
 def cmd_go_live(args) -> int:

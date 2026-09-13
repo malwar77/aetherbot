@@ -212,6 +212,24 @@ the AI brain is advisory-only and can never create, resize or
 approve a trade. Backtest and dry-run results do not predict live
 performance.
 
+## Morning WhatsApp report (status beacon)
+
+The agent (Base44 Superagent) sends a morning WhatsApp report with
+mode, balance, daily PnL, open trades, daily-loss-limit distance and
+a watchdog alert if the bot stops checking in. This bot feeds it:
+
+1. Set env vars (or pass flags): `STATUS_URL` (the ingest endpoint
+   the agent gives you) and `STATUS_TOKEN` (the shared token).
+2. `aetherbot report --config config.yaml` — prints the snapshot;
+   with STATUS_URL/STATUS_TOKEN set it POSTs it too.
+3. Schedule it before the agent's 7:30am ET run, e.g. cron at
+   07:15 America/New_York:
+   `15 7 * * * cd /path/to/aetherbot && python -m aetherbot.main report --config config.yaml`
+
+Strictly read-only and advisory: the report never places, approves
+or alters trades, and live balance is not queried (host-authoritative
+numbers only). The RiskManager on this host stays authoritative.
+
 ## Backtesting honesty
 
 `aetherbot.main backtest` reports absolute P&L AND a verdict against
