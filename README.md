@@ -104,6 +104,27 @@ python -m aetherbot.main create-strategy MyStrategy     # scaffold
 python -m aetherbot.main web --config config/config.example.yaml
 ```
 
+## Web dashboard on your LAN
+
+`aetherbot web` serves a terminal-style dashboard — black background,
+green for profit, red for loss, blue for information, live-pulsing
+status dot, auto-refresh every 5 seconds:
+
+```
+python -m aetherbot.main web --config config/config.example.yaml
+# prints both URLs:
+#   this machine:  http://127.0.0.1:8080
+#   on your LAN:   http://192.168.x.x:8080   <- open from your phone
+```
+
+The dashboard is READ-ONLY by design: no trade controls exist on the
+web surface. Anyone on your Wi-Fi can view it; nobody can trade from
+it. To restrict it to this machine only, set `webui host: "127.0.0.1"`
+in the YAML.
+
+Historical and dry-run results do not imply future performance. Live
+trading can lead to total loss of capital.```
+
 ## New here? Start here
 
 AetherBot is a self-hosted crypto trading bot in the spirit of

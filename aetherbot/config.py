@@ -129,7 +129,10 @@ class TelegramConfig(BaseModel):
 class WebUIConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = True
-    host: str = "127.0.0.1"
+    # 0.0.0.0 = reachable from other devices on your LAN (read-only
+    # surface). Set host: "127.0.0.1" in the YAML to lock it to this
+    # machine only.
+    host: str = "0.0.0.0"
     port: int = 8080
 
 

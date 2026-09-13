@@ -16,6 +16,21 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from ..config import load_config
 
 
+def lan_url() -> str:
+    """Best-effort LAN IP of this machine (for the dashboard URL).
+    Never raises — falls back to 127.0.0.1."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))  # no packets sent; just routing
+            return s.getsockname()[0]
+        finally:
+            s.close()
+    except OSError:  # pragma: no cover
+        return "127.0.0.1"
+
+
 def create_app(config_path: str = "config/config.example.yaml") -> FastAPI:
     cfg = load_config(config_path)
     app = FastAPI(title="AetherBot Web UI",

@@ -3,83 +3,173 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AetherBot — dashboard (read-only)</title>
+<title>AetherBot — Terminal</title>
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, sans-serif; margin: 0;
-         background: #f6f7f9; color: #1a1d21; }
-  @media (prefers-color-scheme: dark) {
-    body { background: #14171a; color: #e8eaed; }
-    .card { background: #1c2025 !important; border-color: #2a2f36 !important; }
+  :root {
+    --bg: #04070a; --panel: #0a0f14; --panel2: #0c1218;
+    --green: #00e68a; --green-dim: #06231a;
+    --red: #ff4d5e; --red-dim: #26060d;
+    --blue: #4da3ff; --blue-dim: #071a2e;
+    --text: #c8d6e0; --muted: #5f7180; --border: #14212c;
+    --mono: ui-monospace, 'JetBrains Mono', 'Fira Code',
+            'SF Mono', Consolas, Menlo, monospace;
   }
-  header { padding: 16px 24px; border-bottom: 1px solid #d0d5dd; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .warn { font-size: 12px; color: #b42318; font-weight: 600; }
-  .grid { display: grid; gap: 16px; padding: 24px;
-          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-  .card { background: #fff; border: 1px solid #d0d5dd; border-radius: 10px;
-          padding: 16px; }
-  .card h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase;
-             letter-spacing: .04em; opacity: .65; }
-  .big { font-size: 26px; font-weight: 700; }
-  .neg { color: #b42318; } .pos { color: #067647; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  td, th { padding: 6px 8px; border-bottom: 1px solid #e4e7ec;
-           text-align: left; }
-  footer { padding: 8px 24px 24px; font-size: 12px; opacity: .7; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: var(--mono); background: var(--bg); color: var(--text);
+    margin: 0; padding: 20px; max-width: 1100px; margin-inline: auto;
+    background-image:
+      radial-gradient(ellipse 800px 300px at 50% -10%,
+        rgba(77,163,255,.06), transparent),
+      radial-gradient(ellipse 600px 200px at 90% 110%,
+        rgba(0,230,138,.05), transparent);
+  }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 14px;
+           margin-bottom: 20px; display: flex; align-items: baseline;
+           justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  h1 { font-size: 17px; margin: 0; letter-spacing: .08em; color: var(--green);
+       text-shadow: 0 0 14px rgba(0,230,138,.35); }
+  h1 .bot { color: var(--blue); text-shadow: 0 0 14px rgba(77,163,255,.35); }
+  .live-dot { display: inline-block; width: 9px; height: 9px;
+              border-radius: 50%; background: var(--green); margin-right: 6px;
+              box-shadow: 0 0 8px var(--green);
+              animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .sub { color: var(--muted); font-size: 12px; }
+  .cards { display: grid; gap: 14px; grid-template-columns:
+            repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 20px; }
+  .card { background: linear-gradient(180deg, var(--panel2), var(--panel));
+          border: 1px solid var(--border); border-radius: 10px;
+          padding: 16px; position: relative; overflow: hidden; }
+  .card::before { content: ""; position: absolute; inset: 0 auto auto 0;
+    width: 3px; height: 100%; background: var(--blue); opacity: .8; }
+  .card.g::before { background: var(--green); }
+  .card.r::before { background: var(--red); }
+  .label { font-size: 11px; letter-spacing: .12em; color: var(--muted);
+           text-transform: uppercase; margin-bottom: 8px; }
+  .value { font-size: 22px; font-weight: 700; }
+  .pos { color: var(--green); text-shadow: 0 0 10px rgba(0,230,138,.3); }
+  .neg { color: var(--red); text-shadow: 0 0 10px rgba(255,77,94,.3); }
+  .blue { color: var(--blue); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px;
+          background: var(--panel); border: 1px solid var(--border);
+          border-radius: 10px; overflow: hidden; }
+  th { text-align: left; padding: 10px 12px; color: var(--blue);
+       background: var(--blue-dim); font-size: 11px; letter-spacing: .1em;
+       text-transform: uppercase; }
+  td { padding: 9px 12px; border-top: 1px solid var(--border); }
+  tr:hover td { background: rgba(77,163,255,.04); }
+  .banner { border: 1px solid var(--border); border-left: 3px solid
+            var(--red); background: var(--red-dim); color: #ff8a95;
+            padding: 10px 14px; border-radius: 8px; font-size: 12px;
+            margin-bottom: 18px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 16px;
+          line-height: 1.6; }
+  #updated { color: var(--blue); }
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot { animation: none; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>AetherBot — read-only dashboard</h1>
-  <div class="warn">⚠️ Educational software. Live trading can lead to TOTAL
-  LOSS of capital. Dry-run first. Nothing here is financial advice.</div>
+  <div>
+    <h1><span class="live-dot"></span>AETHER<span class="bot">BOT</span></h1>
+    <div class="sub">read-only terminal · no trade controls by design</div>
+  </div>
+  <div class="sub">mode: <span id="mode" class="blue">…</span> ·
+      updated <span id="updated">…</span></div>
 </header>
-<div class="grid">
-  <div class="card"><h2>Mode</h2><div class="big" id="mode">…</div>
-    <div id="pairs"></div></div>
-  <div class="card"><h2>Balance</h2><div class="big" id="balance">…</div></div>
-  <div class="card"><h2>Total P&L (closed)</h2>
-    <div class="big" id="pnl">…</div>
-    <div id="wl"></div></div>
-  <div class="card"><h2>Open trades</h2><div class="big"
-      id="open">…</div></div>
+
+<div id="disclaimer-slot"></div>
+
+<div class="cards">
+  <div class="card g"><div class="label">Open positions</div>
+    <div class="value" id="open">…</div></div>
+  <div class="card"><div class="label">Closed trades</div>
+    <div class="value" id="closed">…</div></div>
+  <div class="card g"><div class="label">Wins</div>
+    <div class="value pos" id="wins">…</div></div>
+  <div class="card r"><div class="label">Losses</div>
+    <div class="value neg" id="losses">…</div></div>
+  <div class="card"><div class="label">Total PnL</div>
+    <div class="value" id="pnl">…</div></div>
 </div>
-<div class="grid"><div class="card" style="grid-column: 1/-1">
-  <h2>Recent trades</h2>
-  <table><thead><tr><th>pair</th><th>mode</th><th>entry</th><th>exit</th>
-  <th>pnl</th><th>roi</th><th>reason</th><th>opened</th></tr></thead>
-  <tbody id="rows"></tbody></table>
-</div></div>
-<footer>P&L shows real numbers only, including losses. No promise of
-gains is made or implied. No trade controls exist on this page.</footer>
+
+<h2 style="font-size:13px; letter-spacing:.1em; color: var(--blue);">OPEN TRADES</h2>
+<table id="open-table">
+  <thead><tr><th>Pair</th><th>Side</th><th>Stake</th><th>Opened</th>
+    <th>Current PnL</th></tr></thead>
+  <tbody id="open-body"><tr><td colspan="5" class="sub">…</td></tr></tbody>
+</table>
+
+<h2 style="font-size:13px; letter-spacing:.1em; color: var(--blue); margin-top:22px;">RECENT CLOSED TRADES</h2>
+<table>
+  <thead><tr><th>Pair</th><th>Side</th><th>Stake</th><th>PnL</th>
+    <th>Opened</th><th>Closed</th></tr></thead>
+  <tbody id="trades-body"><tr><td colspan="6" class="sub">…</td></tr></tbody>
+</table>
+
+<div class="note" id="disclaimer"></div>
+
 <script>
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+function pnlClass(v) { return v >= 0 ? "pos" : "neg"; }
+function sgn(v) { return (v >= 0 ? "+" : "") + Number(v).toFixed(2); }
+
 async function refresh() {
   try {
-    const s = await (await fetch('/api/status')).json();
-    document.getElementById('mode').textContent = (s.mode || '').toUpperCase();
-    document.getElementById('pairs').textContent =
-      (s.pairs || []).join(' · ') + ' · ' + (s.timeframe || '');
-    document.getElementById('pnl').textContent = (s.total_pnl ?? 0).toFixed(4);
-    document.getElementById('pnl').className =
-      'big ' + ((s.total_pnl || 0) < 0 ? 'neg' : 'pos');
-    document.getElementById('wl').textContent =
-      `${s.wins ?? 0} wins / ${s.losses ?? 0} losses`;
-    document.getElementById('open').textContent =
+    const s = await (await fetch("/api/status")).json();
+    document.getElementById("mode").textContent = s.mode;
+    document.getElementById("updated").textContent =
+      new Date().toLocaleTimeString();
+    document.getElementById("open").textContent =
       (s.open_trades || []).length;
-    document.getElementById('balance').textContent =
-      (s.open_trades||[]).length + ' positions';
-    const rows = await (await fetch('/api/trades?limit=30')).json();
-    document.getElementById('rows').innerHTML = (Array.isArray(rows) ?
-      rows : []).map(t =>
-      `<tr><td>${t.pair}</td><td>${t.mode}</td><td>${t.entry_price}</td>
-       <td>${t.exit_price ?? '—'}</td>
-       <td class="${(t.pnl||0)<0?'neg':'pos'}">${t.pnl ?? 'open'}</td>
-       <td>${t.roi ?? ''}</td><td>${t.stop_reason ?? ''}</td>
-       <td>${t.open_date}</td></tr>`).join('');
-  } catch (e) { console.error(e); }
+    document.getElementById("closed").textContent = s.closed_trades ?? "?";
+    document.getElementById("wins").textContent = s.wins ?? "?";
+    document.getElementById("losses").textContent = s.losses ?? "?";
+    const pnl = document.getElementById("pnl");
+    const p = s.total_pnl ?? 0;
+    pnl.textContent = sgn(p);
+    pnl.className = "value " + pnlClass(p);
+    const ob = document.getElementById("open-body");
+    if ((s.open_trades || []).length) {
+      ob.innerHTML = s.open_trades.map(t =>
+        `<tr><td class="blue">${esc(t.pair)}</td>
+         <td>${esc(t.side)}</td><td>${esc(t.stake)}</td>
+         <td class="sub">${esc(t.open_date)}</td>
+         <td class="${pnlClass(t.current_profit || 0)}">
+         ${sgn(t.current_profit || 0)}</td></tr>`).join("");
+    } else {
+      ob.innerHTML = `<tr><td colspan="5" class="sub">no open positions</td></tr>`;
+    }
+    const d = document.getElementById("disclaimer");
+    if (s.disclaimer) d.textContent = s.disclaimer;
+    const slot = document.getElementById("disclaimer-slot");
+    if (s.mode === "never started") {
+      slot.innerHTML = `<div class="banner">${esc(s.note)}</div>`;
+    } else { slot.innerHTML = ""; }
+    const t = await (await fetch("/api/trades?limit=20")).json();
+    const tb = document.getElementById("trades-body");
+    if (Array.isArray(t) && t.length) {
+      tb.innerHTML = t.filter(x => !x.is_open).map(x =>
+        `<tr><td class="blue">${esc(x.pair)}</td><td>${esc(x.side)}</td>
+         <td>${esc(x.stake)}</td>
+         <td class="${pnlClass(x.pnl || 0)}">${sgn(x.pnl || 0)}</td>
+         <td class="sub">${esc(x.open_date)}</td>
+         <td class="sub">${esc(x.close_date)}</td></tr>`).join("")
+        || `<tr><td colspan="6" class="sub">no closed trades yet</td></tr>`;
+    } else {
+      tb.innerHTML = `<tr><td colspan="6" class="sub">no closed trades yet</td></tr>`;
+    }
+  } catch (e) {
+    document.getElementById("updated").textContent = "connection lost";
+  }
 }
-refresh(); setInterval(refresh, 5000);
+refresh();
+setInterval(refresh, 5000);
 </script>
 </body>
 </html>

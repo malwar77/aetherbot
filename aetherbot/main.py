@@ -115,9 +115,17 @@ def cmd_create(args) -> int:
 def cmd_web(args) -> int:
     cfg = load_config(args.config)
     import uvicorn
-    from .webui.app import create_app
-    uvicorn.run(create_app(args.config), host=cfg.webui.host,
-                port=cfg.webui.port)
+    from .webui.app import create_app, lan_url
+    app = create_app(args.config)
+    print("AetherBot web terminal (read-only — no trade controls here)")
+    print("  this machine:  http://127.0.0.1:%d" % cfg.webui.port)
+    if cfg.webui.host not in ("127.0.0.1", "localhost"):
+        print("  on your LAN:   http://%s:%d" % (lan_url(), cfg.webui.port))
+        print("  read-only: anyone on your network can VIEW it, "
+              "nobody can trade from it")
+    else:
+        print("  (LAN access disabled — set webui host: \"0.0.0.0\" to open it)")
+    uvicorn.run(app, host=cfg.webui.host, port=cfg.webui.port)
 
 
 def main(argv=None) -> int:

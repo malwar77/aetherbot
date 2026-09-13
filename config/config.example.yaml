@@ -71,7 +71,9 @@ telegram:
 
 webui:
   enabled: true
-  host: "127.0.0.1"
+  # 0.0.0.0 = open the dashboard to your local network (read-only).
+  # Use "127.0.0.1" to keep it on this machine only.
+  host: "0.0.0.0"
   port: 8080
 
 persistence:
